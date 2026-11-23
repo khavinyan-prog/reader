@@ -1,3 +1,4 @@
 node_modules/
 dump.mjs
 tests/out/
+tests/_book_node.mjs
