@@ -195,10 +195,13 @@ export function pageParagraphs(lines, ctx) {
   let dropBase = null;
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (/^[A-Z“‘"']?[A-Z]$/.test(l.text) && l.size > body * 1.6 && lines[i + 1]) {
-      // A drop cap: the big first letter is drawn apart from the rest of its word.
-      const below = lines.slice(i + 1, i + 4).filter((n) => n.y >= l.y - 1 && Math.abs(n.size - body) <= body * 0.2);
-      const n = below.length ? below.reduce((a, b) => (b.y > a.y ? b : a)) : lines[i + 1];
+    // A drop cap: the big first letter is drawn apart from the rest of its word, beside the first lines
+    // (its baseline sits level with or below them). A big letter above the text, like a chapter numeral "I", is not one.
+    const below = /^[A-Z“‘"']?[A-Z]$/.test(l.text) && l.size > body * 1.6
+      ? lines.slice(i + 1, i + 4).filter((n) => n.y >= l.y - 1 && n.y - l.y <= l.size * 1.3 && n.x > l.x + 1 && Math.abs(n.size - body) <= body * 0.2)
+      : [];
+    if (below.length) {
+      const n = below.reduce((a, b) => (b.y > a.y ? b : a));
       const j = lines.indexOf(n);
       for (let k = i + 1; k < j; k++) ls.push(lines[k]);
       ls.push({ ...n, text: l.text + n.text, x: Math.min(l.x, n.x), dropCap: true });

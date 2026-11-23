@@ -585,7 +585,7 @@ function menuSheet() {
       <div class="goto-in"><input id="gotoInput" type="number" inputmode="numeric" min="1" max="${book.numPages}" value="${p}"><span class="of">מתוך ${book.numPages}</span><button class="btn accent" type="submit">מעבר</button></div>
     </form>
     <button class="row link" id="chaptersRow" type="button" ${outline.length ? '' : 'hidden'}>${ICONS.list}<span>פרקים</span><span class="sub">${outline.length}</span></button>
-    <button class="row link" id="voiceRow" type="button">${ICONS.voice}<span>קול הקריין</span><span class="sub" dir="ltr">${player.voice ? player.voice.name : ''}</span></button>
+    <button class="row link" id="voiceRow" type="button">${ICONS.voice}<span>קול הקריין</span><span class="sub" dir="ltr"></span></button>
     <div class="row">
       <span class="lbl">תצוגה</span>
       <div class="seg" role="group" aria-label="ערכת צבעים">
@@ -600,6 +600,7 @@ function menuSheet() {
   box.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); const v = Number(box.querySelector('input').value); if (v) goToPage(v); });
   box.querySelector('#chaptersRow').addEventListener('click', chaptersSheet);
   box.querySelector('#voiceRow').addEventListener('click', voiceSheet);
+  box.querySelector('#voiceRow .sub').textContent = shortVoiceName(player.voice);
   box.querySelectorAll('[data-theme]').forEach((b) => {
     b.classList.toggle('on', b.dataset.theme === prefs.theme);
     b.addEventListener('click', () => { setTheme(b.dataset.theme); box.querySelectorAll('[data-theme]').forEach((x) => x.classList.toggle('on', x === b)); });
@@ -668,7 +669,7 @@ function preview(v) {
 
 function speedSheet() {
   const box = el(`<div class="speed">
-    <div class="speed-big"><button type="button" class="round" data-d="-0.1" aria-label="לאט יותר">−</button><output dir="ltr" class="speed-val"></output><button type="button" class="round" data-d="0.1" aria-label="מהר יותר">+</button></div>
+    <div class="speed-big" dir="ltr"><button type="button" class="round" data-d="-0.1" aria-label="לאט יותר">−</button><output dir="ltr" class="speed-val"></output><button type="button" class="round" data-d="0.1" aria-label="מהר יותר">+</button></div>
     <input type="range" min="0.75" max="2.5" step="0.05" dir="ltr" aria-label="מהירות">
     <div class="presets" dir="ltr">${[0.9, 1, 1.2, 1.4, 1.6, 2].map((r) => `<button type="button" data-r="${r}">${r.toFixed(1)}×</button>`).join('')}</div>
   </div>`);
@@ -702,9 +703,12 @@ function chooseVoice(v) {
   updateVoiceChip();
 }
 
+function shortVoiceName(v) {
+  return v ? v.name.replace(/^Microsoft\s+/, '').replace(/\s+-\s+English.*$/, '') : '';
+}
+
 function updateVoiceChip() {
-  const v = player.voice;
-  $('#voiceName').textContent = v ? v.name.replace(/^Microsoft\s+/, '').replace(/\s+-\s+English.*$/, '') : 'קול';
+  $('#voiceName').textContent = shortVoiceName(player.voice) || 'קול';
 }
 
 function pickVoice() {
