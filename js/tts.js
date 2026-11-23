@@ -7,7 +7,8 @@ const NOVELTY = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jes
 
 export function voiceScore(v) {
   let s = 0;
-  const n = v.name;
+  // iOS reports quality in the voice id too, e.g. com.apple.voice.premium.en-US.Zoe
+  const n = v.name + ' ' + (v.voiceURI || '');
   if (/natural|neural/i.test(n)) s += 100;
   if (/online/i.test(n)) s += 60;
   if (/premium/i.test(n)) s += 90;
