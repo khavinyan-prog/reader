@@ -228,7 +228,7 @@ export function pageParagraphs(lines, ctx) {
     if (!start) {
       const gap = prev.y - l.y;
       const indent = l.x - leftX;
-      if (heading || cur.heading) start = true;
+      if (heading || cur.heading || l.paraStart) start = true;
       else if (gap < -body * 0.5 || gap > lineGap * 1.5 + 0.5) start = true;
       else if (indent > body * 0.6 && indent < body * 8 && bodyLines.length > 3 && !l.dropCap && !l.wrapped) start = true;
       else if (TERMINAL.test(prev.text) && rightX && prev.right < rightX - body * 3 && Math.abs(prev.size - body) <= body * 0.12) start = true;

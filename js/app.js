@@ -732,12 +732,33 @@ function showNotice(msg, scanned) {
   n.textContent = '';
   n.append(el(`<p></p>`));
   n.firstChild.textContent = msg;
-  if (scanned && window.__ocr) {
-    const b = el('<button type="button" class="btn accent">לזהות את הטקסט מהתמונות (איטי)</button>');
-    b.addEventListener('click', () => window.__ocr.start(book, { onPage: () => {} }));
+  if (scanned) {
+    const b = el('<button type="button" id="ocrBtn" class="btn accent">לזהות את הטקסט מהתמונות</button>');
+    b.addEventListener('click', startOcr);
     n.append(b);
   }
   n.hidden = false;
+}
+
+async function startOcr() {
+  const b = book;
+  const { ocrPage } = await import('./ocr.js');
+  if (b !== book) return;
+  b.onOcr = (p, st) => {
+    if (b !== book) return;
+    $('#notice').firstChild.textContent = st === 'start'
+      ? `מזהה את הטקסט בעמוד ${p}… בכל עמוד זה לוקח כמה שניות, והספר ממשיך להיטען בזמן ההקראה.`
+      : 'הזיהוי רץ עמוד אחרי עמוד. אפשר להתחיל להקשיב.';
+  };
+  b.enableOcr(ocrPage);
+  const btn = $('#ocrBtn');
+  if (btn) btn.remove();
+  $('#notice').firstChild.textContent = 'טוען את מנוע הזיהוי…';
+  const start = meta && meta.pos ? meta.pos.page : 1;
+  await jumpTo(start, null);
+  if (b !== book) return;
+  const first = await b.firstIdFrom(start);
+  if (first && !curId) { await ensureRendered(first); markCurrent(first, false); }
 }
 
 let toastTimer = null;

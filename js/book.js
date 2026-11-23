@@ -39,7 +39,8 @@ export class Book {
     this.infoCache = new Map(); // page -> Promise<info>
     this.sentCache = new Map(); // page -> Promise<sentences>
     this.ready = new Map(); // page -> sentences (sync access)
-    this.ocrPages = new Map(); // page -> lines from OCR
+    this.ocr = null;
+    this.onOcr = null;
     this.edges = null;
     this.bodySize = 10;
   }
@@ -66,11 +67,17 @@ export class Book {
     if (p < 1 || p > this.numPages) return null;
     if (!this.rawCache.has(p)) {
       this.rawCache.set(p, (async () => {
-        if (this.ocrPages.has(p)) return this.ocrPages.get(p);
         const page = await this.pdf.getPage(p);
         const tc = await page.getTextContent({ includeMarkedContent: false });
         page.cleanup();
-        return buildLines(tc.items);
+        const lines = buildLines(tc.items);
+        if (this.ocr && lines.reduce((a, l) => a + l.text.length, 0) < 15) {
+          if (this.onOcr) this.onOcr(p, 'start');
+          const ocrLines = await this.ocr(this, p);
+          if (this.onOcr) this.onOcr(p, 'done');
+          return ocrLines;
+        }
+        return lines;
       })().catch(() => []));
     }
     return this.rawCache.get(p);
@@ -80,9 +87,13 @@ export class Book {
     if (p < 1 || p > this.numPages) return null;
     if (!this.infoCache.has(p)) {
       this.infoCache.set(p, (async () => {
-        const [l2, l1, l0, r1, r2] = await Promise.all([p - 2, p - 1, p, p + 1, p + 2].map((q) => this.rawLines(q)));
-        const lines = stripEdges(l0 || [], this.edges, [l2, l1, r1, r2], this.bodySize);
-        const res = pageParagraphs(lines, { bodySize: this.bodySize });
+        // With OCR every page is expensive, so running heads are judged without looking at neighbours.
+        const near = this.ocr ? [p] : [p - 2, p - 1, p, p + 1, p + 2];
+        const got = await Promise.all(near.map((q) => this.rawLines(q)));
+        const l0 = this.ocr ? got[0] : got[2];
+        const body = this.ocr ? 0 : this.bodySize;
+        const lines = stripEdges(l0 || [], this.edges, this.ocr ? null : [got[0], got[1], got[3], got[4]], body);
+        const res = pageParagraphs(lines, { bodySize: body });
         res.chars = (l0 || []).reduce((a, l) => a + l.text.length, 0);
         return res;
       })());
@@ -227,11 +238,14 @@ export class Book {
     return { canvas, height: vp.height, scale };
   }
 
-  // Replace a page's text with OCR lines (PDF coordinates) and drop caches that depend on it.
-  setOcrLines(p, lines) {
-    this.ocrPages.set(p, lines);
-    for (const q of [p - 2, p - 1, p, p + 1, p + 2]) { this.rawCache.delete(q); this.infoCache.delete(q); }
-    for (const q of [p - 4, p - 3, p - 2, p - 1, p, p + 1, p + 2, p + 3, p + 4]) { this.sentCache.delete(q); this.ready.delete(q); }
+  // Scanned book: from now on pages without a text layer are recognised with OCR (fn(book, page) -> lines).
+  enableOcr(fn) {
+    this.ocr = fn;
+    this.scanned = false;
+    this.rawCache.clear();
+    this.infoCache.clear();
+    this.sentCache.clear();
+    this.ready.clear();
   }
 
   destroy() {

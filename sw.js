@@ -1,5 +1,5 @@
 // Offline cache: app shell and vendored libraries, cache-first.
-const VERSION = 'reader-v1';
+const VERSION = 'reader-v2';
 const SHELL = [
   './',
   'index.html',
@@ -9,6 +9,7 @@ const SHELL = [
   'js/text.js',
   'js/tts.js',
   'js/store.js',
+  'js/ocr.js',
   'manifest.webmanifest',
   'icons/icon.svg',
   'icons/icon-192.png',

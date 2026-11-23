@@ -258,6 +258,19 @@ async function window_goto(page, n) {
   const msg = await page.locator('#notice').innerText();
   check('scanned PDF: clear Hebrew message', /סריקה/.test(msg), msg);
   await page.screenshot({ path: path.join(OUT, 'mobile-scanned.png') });
+  const t0 = Date.now();
+  await page.click('#ocrBtn');
+  let ocrOk = true;
+  try { await waitFor(page, () => /bright cold day in April/.test(document.querySelector('#text').innerText), null, 180000); } catch { ocrOk = false; }
+  const ocrText = await page.evaluate(() => document.querySelector('#text').innerText.slice(0, 400));
+  check('OCR turns a scanned page into readable sentences', ocrOk, `${Date.now() - t0} ms: ${ocrText.replace(/\s+/g, ' ').slice(0, 160)}`);
+  if (ocrOk) {
+    await page.locator('#text .s').first().click();
+    await waitFor(page, () => window.__ttsLog.some((e) => e.ev === 'speak'));
+    const first = await page.evaluate(() => window.__ttsLog.find((e) => e.ev === 'speak').text);
+    check('OCR text can be read aloud', /April|bright/.test(first), first);
+    await page.screenshot({ path: path.join(OUT, 'mobile-ocr.png') });
+  }
   await ctx.close();
 }
 
