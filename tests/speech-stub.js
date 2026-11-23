@@ -12,7 +12,9 @@
     speaking: false, pending: false, paused: false, queue: [], cur: null, timer: null,
     getVoices() { return voices; },
     addEventListener() {}, onvoiceschanged: null,
-    speak(u) { this.queue.push(u); this.pending = true; if (!this.cur) this._next(); },
+    speak(u) {
+      if (window.__dropNext) { window.__dropNext = false; log.push({ ev: 'dropped', text: u.text, t: Date.now() }); return; }
+      this.queue.push(u); this.pending = true; if (!this.cur) this._next(); },
     _next() {
       const u = this.queue.shift();
       this.pending = this.queue.length > 0;

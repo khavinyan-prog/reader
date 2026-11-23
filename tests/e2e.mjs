@@ -101,6 +101,15 @@ const spoken = (page) => page.evaluate(() => window.__ttsLog.filter((e) => e.ev 
   const pausedText = await page.evaluate((id) => window.__reader.book.sentenceSync(id).text, pausedAt);
   check('resume restarts the same sentence', resumed === pausedText, resumed);
 
+  // an utterance the engine silently drops is retried, not skipped
+  await page.evaluate(() => { window.__dropNext = true; });
+  let dropOk = true;
+  try {
+    await waitFor(page, () => { const l = window.__ttsLog; const i = l.findIndex((e) => e.ev === 'dropped'); return i >= 0 && l.slice(i + 1).some((e) => e.ev === 'speak'); }, null, 30000);
+  } catch { dropOk = false; }
+  const dropInfo = await page.evaluate(() => { const l = window.__ttsLog; const i = l.findIndex((e) => e.ev === 'dropped'); const n = l.slice(i + 1).find((e) => e.ev === 'speak'); return { dropped: l[i] && l[i].text, next: n && n.text }; });
+  check('engine drops a sentence: it is spoken again, not skipped', dropOk && dropInfo.dropped === dropInfo.next, JSON.stringify(dropInfo));
+
   // speed
   await page.click('#speedBtn');
   await page.click('.speed [data-d="0.1"]');

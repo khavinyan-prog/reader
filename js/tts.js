@@ -132,10 +132,17 @@ export class Player {
     u.rate = this.rate;
     if (this.voice) { u.voice = this.voice; u.lang = this.voice.lang; } else u.lang = 'en-US';
     let lastEvent = Date.now();
-    u.onstart = () => { lastEvent = Date.now(); };
+    let started = false;
+    // An utterance the engine dropped before saying anything is tried once more, never skipped.
+    const retryOrAdvance = () => {
+      if (!started && this.retryFor !== id) { this.retryFor = id; this.speakCurrent(); return; }
+      this.advance(gen);
+    };
+    u.onstart = () => { lastEvent = Date.now(); started = true; };
     u.onboundary = (e) => {
       if (gen !== this.gen) return;
       lastEvent = Date.now();
+      started = true;
       if (e.name && e.name !== 'word') return;
       const start = e.charIndex;
       if (typeof start !== 'number' || start < 0 || start >= text.length) return;
@@ -154,8 +161,8 @@ export class Player {
       if (gen !== this.gen) return;
       if (e.error === 'interrupted' || e.error === 'canceled') return;
       if (e.error === 'not-allowed') { this.playing = false; this.gen++; this.h.onState('blocked'); return; }
-      // Voice or engine problem on this sentence: wait a moment, then move on.
-      setTimeout(() => { if (gen === this.gen) this.advance(gen); }, 400);
+      // Voice or engine problem on this sentence: wait a moment, try it again once, then move on.
+      setTimeout(() => { if (gen === this.gen) retryOrAdvance(); }, 400);
     };
     this.u = u; // keep a reference: Chrome can garbage-collect utterances and drop onend
     const go = () => { if (gen === this.gen) synth.speak(u); };
@@ -171,7 +178,7 @@ export class Player {
       if (gen !== this.gen) return;
       if (synth.paused && this.playing) synth.resume();
       const quiet = Date.now() - lastEvent;
-      if (!synth.speaking && !synth.pending && quiet > 1500) { this.advance(gen); return; }
+      if (!synth.speaking && !synth.pending && quiet > 1500) { retryOrAdvance(); return; }
       this.timer = setTimeout(check, 2000);
     };
     this.timer = setTimeout(check, expected * 1.6 + 5000);

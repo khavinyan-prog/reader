@@ -1,0 +1,22 @@
+// The showcase screenshot: a real book on an iPhone-size screen while it is being read.
+import { chromium, devices } from 'playwright';
+import fs from 'fs';
+import path from 'path';
+const [BASE, PDF, OUT] = process.argv.slice(2);
+const stub = fs.readFileSync(new URL('./speech-stub.js', import.meta.url), 'utf8');
+const browser = await chromium.launch({ channel: 'msedge' });
+const ctx = await browser.newContext({ ...devices['iPhone 13'] });
+await ctx.addInitScript(stub);
+const page = await ctx.newPage();
+await page.goto(BASE + '?nosw');
+await page.setInputFiles('#file', PDF);
+await page.waitForFunction(() => document.querySelectorAll('#text .s').length > 0 && document.querySelector('#busy').hidden);
+await page.evaluate(() => window.__reader.goToPage(12));
+await page.waitForFunction(() => (window.__reader.curId || '').startsWith('12:'));
+await page.evaluate(() => { window.__wordMs = 1200; });
+const target = page.locator('#text .s', { hasText: 'Such amiable qualities must speak for themselves' });
+await target.click();
+await new Promise((r) => setTimeout(r, 2600));
+await page.screenshot({ path: OUT });
+console.log(await page.evaluate(() => [window.__reader.curId, [...CSS.highlights.get('word')][0]?.toString()]));
+await browser.close();

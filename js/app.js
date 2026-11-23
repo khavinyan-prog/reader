@@ -493,9 +493,15 @@ function releaseWake() {
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
 }
 
+// Phones stop speech when the screen locks or the app goes to the background. Pausing here keeps the
+// position on the interrupted sentence, so play starts it again instead of skipping it.
+const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && player.playing) requestWake();
-  if (document.visibilityState === 'hidden') savePosition(true);
+  if (document.visibilityState === 'hidden') {
+    if (MOBILE && player.playing) player.pause();
+    savePosition(true);
+  }
 });
 addEventListener('pagehide', () => savePosition(true));
 
