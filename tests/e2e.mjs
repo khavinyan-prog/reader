@@ -110,6 +110,16 @@ const spoken = (page) => page.evaluate(() => window.__ttsLog.filter((e) => e.ev 
   const dropInfo = await page.evaluate(() => { const l = window.__ttsLog; const i = l.findIndex((e) => e.ev === 'dropped'); const n = l.slice(i + 1).find((e) => e.ev === 'speak'); return { dropped: l[i] && l[i].text, next: n && n.text }; });
   check('engine drops a sentence: it is spoken again, not skipped', dropOk && dropInfo.dropped === dropInfo.next, JSON.stringify(dropInfo));
 
+  // an outside interruption (call, Siri) repeats the same sentence
+  await waitFor(page, () => speechSynthesis.speaking);
+  await page.evaluate(() => window.__interrupt());
+  let intrOk = true;
+  try {
+    await waitFor(page, () => { const l = window.__ttsLog; const i = l.findIndex((e) => e.ev === 'external-interrupt'); return i >= 0 && l.slice(i + 1).some((e) => e.ev === 'speak'); }, null, 15000);
+  } catch { intrOk = false; }
+  const intrInfo = await page.evaluate(() => { const l = window.__ttsLog; const i = l.findIndex((e) => e.ev === 'external-interrupt'); const n = l.slice(i + 1).find((e) => e.ev === 'speak'); return { cut: l[i] && l[i].text, next: n && n.text }; });
+  check('outside interruption: the same sentence is said again', intrOk && intrInfo.cut === intrInfo.next, JSON.stringify(intrInfo));
+
   // speed
   await page.click('#speedBtn');
   await page.click('.speed [data-d="0.1"]');
@@ -218,6 +228,11 @@ const spoken = (page) => page.evaluate(() => window.__ttsLog.filter((e) => e.ev 
   await sleep(400);
   await page.screenshot({ path: path.join(OUT, 'mobile-library.png') });
   check('library shows both books', (await page.locator('.book').count()) === 2);
+  page.once('dialog', (d) => d.accept());
+  await page.locator('.book', { hasText: 'Pride and Prejudice' }).locator('.book-del').click();
+  await waitFor(page, () => document.querySelectorAll('.book').length === 1);
+  const left = await page.evaluate(async () => (await new Promise((res) => { const r = indexedDB.open('reader'); r.onsuccess = () => { const t = r.result.transaction('files').objectStore('files').count(); t.onsuccess = () => res(t.result); }; })));
+  check('deleting a book removes it and its file', left === 1, left);
   check('no page errors (mobile)', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }

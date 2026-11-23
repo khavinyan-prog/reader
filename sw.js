@@ -1,5 +1,5 @@
 // Offline cache: app shell and vendored libraries, cache-first.
-const VERSION = 'reader-v6';
+const VERSION = 'reader-v7';
 const SHELL = [
   './',
   'index.html',

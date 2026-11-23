@@ -86,6 +86,7 @@ function ago(t) {
   const d = Math.floor((Date.now() - t) / 86400000);
   if (d <= 0) return 'היום';
   if (d === 1) return 'אתמול';
+  if (d === 2) return 'לפני יומיים';
   if (d < 7) return `לפני ${d} ימים`;
   return new Date(t).toLocaleDateString('he-IL');
 }
@@ -449,8 +450,11 @@ function savePosition(now) {
 }
 
 // ---------- follow mode ----------
-function userScrolled() {
+function userScrolled(e) {
   if (!curId || $('#reader').hidden) return;
+  // Dragging the speed slider or scrolling a list in a sheet is not scrolling the book.
+  if (e && e.target && e.target.closest && e.target.closest('#sheet, .dock, #follow')) return;
+  if (!$('#sheet').hidden) return;
   if (autoFollow) {
     autoFollow = false;
     $('#follow').hidden = false;
@@ -484,8 +488,11 @@ let wakeLock = null;
 async function requestWake() {
   try {
     if ('wakeLock' in navigator && !wakeLock && document.visibilityState === 'visible') {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; });
+      const lock = await navigator.wakeLock.request('screen');
+      // Paused while the request was pending: let the screen sleep again.
+      if (!player.playing || wakeLock) { lock.release().catch(() => {}); return; }
+      wakeLock = lock;
+      lock.addEventListener('release', () => { if (wakeLock === lock) wakeLock = null; });
     }
   } catch { wakeLock = null; }
 }
@@ -497,7 +504,11 @@ function releaseWake() {
 // position on the interrupted sentence, so play starts it again instead of skipping it.
 const MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && player.playing) requestWake();
+  if (document.visibilityState === 'visible' && player.playing) {
+    requestWake();
+    // Back from the background and the engine went quiet: say the current sentence again.
+    setTimeout(() => { if (player.playing && !speechSynthesis.speaking && !speechSynthesis.pending) player.play(player.cur); }, 600);
+  }
   if (document.visibilityState === 'hidden') {
     if (MOBILE && player.playing) player.pause();
     savePosition(true);
@@ -593,7 +604,7 @@ function menuSheet() {
       </div>
     </div>
     <div class="row">
-      <span class="lbl">גודל אות</span>
+      <span class="lbl">גודל טקסט</span>
       <div class="seg size"><button type="button" data-fs="-1" aria-label="קטן יותר">א-</button><span class="fs-val">${prefs.fontSize}</span><button type="button" data-fs="1" aria-label="גדול יותר">א+</button></div>
     </div>
   </div>`);
@@ -609,7 +620,7 @@ function menuSheet() {
     setFontSize(prefs.fontSize + Number(b.dataset.fs) * 2);
     box.querySelector('.fs-val').textContent = prefs.fontSize;
   }));
-  openSheet('הספר', box);
+  openSheet('אפשרויות', box);
 }
 
 function chaptersSheet() {
@@ -718,6 +729,8 @@ function pickVoice() {
   const v = saved || voices[0];
   if (!player.voice || player.voice.name !== v.name) player.voice = v;
   updateVoiceChip();
+  // Voices arrived while the voice list is open: show them.
+  if ($('#sheet').classList.contains('open') && $('#sheetTitle').textContent === 'קול הקריין') voiceSheet();
 }
 
 function setTheme(t) {

@@ -159,7 +159,15 @@ export class Player {
     };
     u.onerror = (e) => {
       if (gen !== this.gen) return;
-      if (e.error === 'interrupted' || e.error === 'canceled') return;
+      if (e.error === 'interrupted' || e.error === 'canceled') {
+        // Our own cancels always change gen first, so this came from outside (a call, Siri, another app).
+        // Say the same sentence again; after repeated interruptions, pause on it instead.
+        if (!this.playing) return;
+        if (this.intrId !== id) { this.intrId = id; this.intrCount = 0; }
+        if (++this.intrCount > 2) { this.pause(); return; }
+        setTimeout(() => { if (gen === this.gen && this.playing) this.speakCurrent(); }, 700);
+        return;
+      }
       if (e.error === 'not-allowed') { this.playing = false; this.gen++; this.h.onState('blocked'); return; }
       // Voice or engine problem on this sentence: wait a moment, try it again once, then move on.
       setTimeout(() => { if (gen === this.gen) retryOrAdvance(); }, 400);

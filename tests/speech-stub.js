@@ -50,6 +50,15 @@
     },
     pause() { this.paused = true; }, resume() { this.paused = false; },
   };
+  // Something outside the app (a call, Siri) stops the speech.
+  window.__interrupt = () => {
+    const u = synth.cur;
+    if (!u) return false;
+    synth.cur = null; synth.speaking = false; clearTimeout(synth.timer);
+    log.push({ ev: 'external-interrupt', text: u.text, t: Date.now() });
+    if (u.onerror) u.onerror({ error: 'interrupted' });
+    return true;
+  };
   Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true, writable: true });
   window.SpeechSynthesisUtterance = FakeUtterance;
 })();
